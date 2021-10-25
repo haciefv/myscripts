@@ -142,7 +142,7 @@ def get_logs1(dictt: dict, file_and_folder_name: str):
         RC.ssh_execute_command(f'sudo cp /var/log/{file_and_folder_name}/{file_and_folder_name}.log /home/centos && ls')
         print('started to download:', dictt['name'])
         RC.scp.get(f'/home/centos/{file_and_folder_name}.log', folder)
-        #RC.ssh_execute_command(f'rm {file_and_folder_name}.log && ls')
+        RC.ssh_execute_command(f'rm {file_and_folder_name}.log && ls')
     except:
         print('Did not find runvm-agent.log in the /home/centos folder, check manually')
     RC.disconnect()
