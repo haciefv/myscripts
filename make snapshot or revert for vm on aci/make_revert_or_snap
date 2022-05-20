@@ -1,0 +1,87 @@
+properties(
+    [
+        [$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: false],
+        [$class: 'JobRestrictionProperty'],
+        [
+            $class: 'ThrottleJobProperty',
+            categories: [],
+            limitOneJobWithMatchingParams: false,
+            maxConcurrentPerNode: 0,
+            maxConcurrentTotal: 0,
+            paramsToUseForLimit: '',
+            throttleEnabled: false,
+            throttleOption: 'project'
+        ],
+        buildDiscarder(
+            logRotator(
+                artifactDaysToKeepStr: '',
+                artifactNumToKeepStr: '10',
+                daysToKeepStr: '',
+                numToKeepStr: '10'
+            )
+        ),
+        parameters(
+            [
+                choice(
+                    choices: ['List', 'Snapshot','Revert'],
+                    description: '',
+                    name: 'parameter'
+                )
+            ]
+        )
+    ]
+)
+
+timestamps {
+    node(label: 'ubuntu') {
+
+        cleanWs()
+
+        try {
+            stage('Code delivery') {
+                git url: 'https://git.acronis.com/scm/~seimur.gadzhiev/my_scripts.git',
+                    branch: 'master',
+                    credentialsId: "2a1f57d0-d0f0-4079-a364-1e319d8aa4cf"
+
+                withCredentials([usernamePassword(credentialsId: '4aaf1c8e-b032-4c04-aad1-b1d1e33cbe9a', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')]) {
+                    sh "python3.9 -m venv venv"
+                    sh """
+                    . venv/bin/activate
+                    pip3 install --no-cache-dir -i https://$ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD@artifactory.corp.acronis.com/api/pypi/global-pypi-prod-virtual/simple -U -r requirements.txt
+                    """
+                }
+            }
+
+            stage('Collection snapshots') {
+                switch(parameter) {
+                    case 'List':
+                        withCredentials([usernamePassword(credentialsId: '2a1f57d0-d0f0-4079-a364-1e319d8aa4cf', passwordVariable: 'OVIRT_PASSWORD', usernameVariable: 'OVIRT_USER')]) {
+                            sh """
+                            . venv/bin/activate
+                            python3.9 snapshot_or_revert.py --list
+                            """
+                        }
+                        break;
+                    case 'Snapshot':
+                        withCredentials([usernamePassword(credentialsId: '2a1f57d0-d0f0-4079-a364-1e319d8aa4cf', passwordVariable: 'OVIRT_PASSWORD', usernameVariable: 'OVIRT_USER')]) {
+                            sh """
+                            . venv/bin/activate
+                            python3.9 snapshot_or_revert.py --snap
+                            """
+                        }
+                        break;
+                    case 'Revert':
+                        sh """
+                        . venv/bin/activate
+                        python3.9 snapshot_or_revert.py --revert
+                        """
+                        break;
+                }
+            }
+        } catch (Exception ex) {
+            echo 'Build failed'
+            echo ex.getMessage()
+            currentBuild.result = "FAILURE"
+        }
+    }
+}

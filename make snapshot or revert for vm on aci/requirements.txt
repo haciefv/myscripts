@@ -1,0 +1,4 @@
+paramiko
+scp
+cryptography
+bcrypt
